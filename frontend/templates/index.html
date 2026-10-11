@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>GCP Traditional Arch - Test App</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; background: #f7f9fc; color: #1f2937; }
+    h1 { color: #1a3a6b; }
+    .card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); max-width: 600px; }
+    form { display: flex; gap: 8px; margin-bottom: 1.5rem; }
+    input[type=text] { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+    button { padding: 8px 16px; background: #1a3a6b; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #142f57; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #e5e7eb; }
+    th { background: #1a3a6b; color: white; }
+    .error { color: #b91c1c; background: #fee2e2; padding: 10px; border-radius: 4px; margin-bottom: 1rem; }
+    .meta { color: #666; font-size: 0.85rem; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>GCP Traditional Architecture - Test App</h1>
+  <div class="card">
+    {% if error %}
+      <div class="error">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/visit">
+      <input type="text" name="name" placeholder="Enter your name" required />
+      <button type="submit">Say hello</button>
+    </form>
+    <table>
+      <tr><th>Name</th><th>Timestamp (UTC)</th><th>ID</th></tr>
+      {% for v in visits %}
+      <tr>
+        <td>{{ v.name }}</td>
+        <td>{{ v.timestamp }}</td>
+        <td>{{ v.id }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p class="meta">Backend URL: {{ backend_url }}</p>
+  </div>
+</body>
+</html>

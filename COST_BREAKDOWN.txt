@@ -1,0 +1,82 @@
+GCP Traditional Architecture (test project) - Cost Breakdown
+==============================================================
+Goal: spin up for ~2-3 hours, test, then delete everything. No SSL/HTTPS.
+Region assumed: us-central1 (cheapest, free-tier-eligible region).
+
+RESOURCE-BY-RESOURCE
+---------------------------------------------------------------------
+1) Custom VPC + Subnet
+   Cost: $0.00 - FREE. Creating a VPC/subnet has no charge by itself.
+   You only pay for specific things placed inside it (NAT, static IPs
+   held in reserve, etc.) - none of which this design uses.
+
+2) Cloud Run - Frontend service
+   Cost: $0.00 for this test. Billed per request/vCPU-second/GiB-second,
+   scales to zero when idle. A free tier of 2M requests, 240,000
+   vCPU-seconds, and 450,000 GiB-seconds is included EVERY MONTH.
+   A few hours of manual testing will not come close to that.
+
+3) Cloud Run - Backend service
+   Cost: $0.00 for this test. Same reasoning as above.
+
+4) Cloud Storage bucket (Standard, regional)
+   Cost: ~$0.00 - $0.01. Storage is $0.020/GB/month, and the "Always
+   Free" tier includes 5 GB-months of US regional storage free, every
+   month. A small amount of test data for a few hours is a fraction of
+   a cent even without the free tier.
+
+5) Global External Application Load Balancer - HTTP ONLY (no SSL)
+   This is the ONE resource that is billed by time, not just by usage,
+   so it's the one thing that actually "ticks" while it exists:
+     - Forwarding rule: $0.025/hour (first 5 rules, global) -> for a
+       2-3 hour test: $0.05 - $0.075 total.
+     - Data processing: ~$0.008-0.012/GB -> negligible for light manual
+       testing (a few MB), well under $0.01.
+     - The external IP itself is FREE while actively attached to an
+       in-use forwarding rule (Google only charges for a static IP that
+       is RESERVED but sitting unused - this won't apply here).
+   No SSL certificate is used, so there is no certificate cost either
+   way - but for the record: Google-managed SSL certs are free anyway
+   (Certificate Manager), so skipping SSL here is purely about keeping
+   setup simple for a beginner, not about avoiding a cost that doesn't
+   exist.
+
+6) Serverless NEGs (Network Endpoint Groups) - connects the Load
+   Balancer to each Cloud Run service
+   Cost: $0.00 - FREE. No charge for the NEG object itself.
+
+7) Cloud Build (CI/CD - triggered on push to main)
+   Cost: $0.00 for this test. First 2,500 build-minutes/month are free.
+   Two small services building a few times will use a few minutes total.
+
+8) Artifact Registry (stores the built container images)
+   Cost: $0.00 for this test. First 0.5 GB/month is free; two small
+   Python-based images will likely fit inside that.
+
+---------------------------------------------------------------------
+TOTAL ESTIMATED COST FOR A 2-3 HOUR TEST: approximately $0.08 - $0.15
+(Essentially all of it is the Load Balancer's hourly forwarding-rule
+charge - everything else realistically rounds to $0.00 at this scale.)
+
+IF YOU FORGET TO DELETE IT:
+The only resource that meaningfully accumulates cost over time is the
+Load Balancer forwarding rule: $0.025/hour -> ~$18.25 if left running
+for a full 30-day month. Everything else stays at/near $0 regardless
+of how long it sits idle (Cloud Run scales to zero, storage of a tiny
+test file is pennies/month). So: the Load Balancer is the one thing to
+make sure gets deleted after your test - that's covered in the
+teardown section of the deployment guide.
+
+WHAT WE ARE DELIBERATELY SKIPPING TO KEEP THIS AT NEAR-ZERO COST:
+ - No Cloud NAT / NAT gateway (not needed - Serverless NEGs don't
+   require the Cloud Run services to be VPC-connected at all)
+ - No static IP reservation held outside of active use
+ - No SSL certificate / HTTPS listener (per your request)
+ - No Cloud SQL, Memorystore, or any other always-on billed-by-the-hour
+   data service
+ - No committed use discounts or reservations (not relevant at this
+   scale, and would only make sense for long-running workloads)
+
+Prices are current real Google Cloud list prices as of Oct 2026 and are
+Google's own published rates, not a quote or guarantee - actual charges
+depend on exact usage and any pricing changes Google makes.
