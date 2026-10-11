@@ -246,8 +246,10 @@ By default, Cloud Run runs as the project's shared "Compute Engine default servi
 3. Variables & Secrets → **Add variable**:
    - Name: `BACKEND_URL`
    - Value: the backend URL you copied in Step 4
-4. Click **Create**. Copy this service's own URL too.
-5. **Open the frontend URL directly in your browser right now** (before touching the Load Balancer) — submit a name in the form and confirm it appears in the list below. This proves frontend → backend → storage works end-to-end *before* adding the Load Balancer on top, so if something's wrong, you know it's not a Load Balancer problem.
+4. Expand **"Container, Volumes, Networking, Security"** → **Container** tab → **Container port** → set it to **`3000`**.
+   > The frontend container listens on port 3000 (not Cloud Run's default of 8080) — the backend still listens on 8080, so only this field needs changing, only on the `frontend` service. If this is left at the default, Cloud Run will send traffic to a port nothing is listening on and every request will fail with a 503.
+5. Click **Create**. Copy this service's own URL too.
+6. **Open the frontend URL directly in your browser right now** (before touching the Load Balancer) — submit a name in the form and confirm it appears in the list below. This proves frontend → backend → storage works end-to-end *before* adding the Load Balancer on top, so if something's wrong, you know it's not a Load Balancer problem.
 
 ---
 

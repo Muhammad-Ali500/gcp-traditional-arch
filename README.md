@@ -21,12 +21,18 @@ docker run -p 8081:8080 --name backend-test traditional-arch-backend
 
 cd ../frontend
 docker build -t traditional-arch-frontend .
-docker run -p 8080:8080 -e BACKEND_URL=http://host.docker.internal:8081 --name frontend-test traditional-arch-frontend
+docker run -p 3000:3000 -e BACKEND_URL=http://host.docker.internal:8081 --name frontend-test traditional-arch-frontend
 ```
 
-Open http://localhost:8080 - submit a name, confirm it shows up in the list.
+Open http://localhost:3000 - submit a name, confirm it shows up in the list.
 With no `GCS_BUCKET_NAME` set, the backend automatically falls back to an
 in-memory list so this works fully offline, with no GCP credentials needed.
+
+> If port 3000 is already taken locally by something else, map to a free host
+> port instead - e.g. `-p 3002:3000` - and just open that port instead. The
+> container always listens on 3000 internally regardless of which host port
+> you map it to; only the internal port (3000) matters once this is deployed
+> to Cloud Run.
 
 ## Deployment
 
