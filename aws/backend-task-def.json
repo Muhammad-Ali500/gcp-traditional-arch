@@ -1,0 +1,31 @@
+{
+  "family": "traditional-arch-backend",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::<AWS_ACCOUNT_ID>:role/traditional-arch-backend-task-role",
+  "containerDefinitions": [
+    {
+      "name": "backend",
+      "image": "<ACCOUNT_ID>.dkr.ecr.<REGION>.amazonaws.com/traditional-arch-backend:placeholder",
+      "essential": true,
+      "portMappings": [
+        { "containerPort": 8080, "protocol": "tcp" }
+      ],
+      "environment": [
+        { "name": "AWS_S3_BUCKET_NAME", "value": "<YOUR_BUCKET_NAME>" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/traditional-arch-backend",
+          "awslogs-region": "<REGION>",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      }
+    }
+  ]
+}

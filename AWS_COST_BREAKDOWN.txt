@@ -1,0 +1,103 @@
+AWS Equivalent Architecture (test project) - Cost Breakdown
+==============================================================
+Goal: spin up for ~2-3 hours, test, then delete everything. No SSL/HTTPS.
+Region assumed: us-east-1 (AWS's standard/cheapest region).
+
+IMPORTANT STRUCTURAL DIFFERENCE FROM THE GCP VERSION:
+Cloud Run scales to zero and is free when idle. AWS Fargate has NO
+equivalent "scale to zero while still serving requests" - a Fargate task
+bills continuously, per second, for as long as its desired count is >= 1,
+whether or not it's receiving traffic. This is the main reason the AWS
+version costs a little more than the GCP version for the same short test.
+
+RESOURCE-BY-RESOURCE (all rates are real, current AWS list prices,
+sourced from aws.amazon.com pricing pages, Oct 2026)
+---------------------------------------------------------------------
+1) VPC + 2 public subnets (2 Availability Zones - required minimum for
+   an Application Load Balancer) + security groups
+   Cost: $0.00 - FREE. No charge for these networking constructs by
+   themselves. (Only NAT Gateways, VPN/Transit Gateway attachments, and
+   unattached Elastic IPs cost money - none of which this design uses.)
+
+2) ECS Fargate - 2 tasks (frontend + backend), smallest size each:
+   0.25 vCPU / 0.5 GB memory, running continuously for the test
+   Real rates: $0.04048/vCPU-hour, $0.004445/GB-hour (Linux/x86, us-east-1)
+   For a 3-hour test:
+     vCPU: 2 tasks x 0.25 vCPU x 3 hr = 1.5 vCPU-hr -> 1.5 x $0.04048 = $0.0607
+     Memory: 2 tasks x 0.5 GB x 3 hr = 3 GB-hr -> 3 x $0.004445 = $0.0133
+   Subtotal: ~$0.074
+
+3) Application Load Balancer - HTTP ONLY (no SSL)
+   Real rates: $0.0225/hour (base) + $0.008/LCU-hour
+   An LCU (Load Balancer Capacity Unit) covers whichever dimension is
+   highest per hour: 25 new connections/sec, 3,000 active connections/min,
+   1 GB/hour processed, or 1,000 rule evaluations/sec. A few hours of
+   light manual testing stays far below 1 LCU on every dimension, so LCU
+   cost is a small fraction of a cent - the $0.0225/hr base dominates.
+   For a 3-hour test: $0.0225 x 3 = $0.0675 + negligible LCU
+   Subtotal: ~$0.07-0.08
+
+4) S3 bucket (Standard storage)
+   Real rate: $0.023/GB-month. PUT requests: $0.005/1,000. GET: $0.0004/1,000.
+   A tiny amount of test data for a few hours is a fraction of a cent
+   regardless of free-tier status.
+   Subtotal: ~$0.00-0.01
+
+5) ECR (Elastic Container Registry) - 2 small images
+   Real rate: $0.10/GB-month storage. Data transfer to Fargate in the
+   same region is free.
+   Two small Python images (~0.3-0.6 GB combined), stored for only a few
+   hours, prorated against the monthly rate: effectively $0.00.
+
+6) Data transfer OUT to the internet
+   The first 100 GB/month is an "Always Free" allowance across all AWS
+   services and regions - this is permanent, not tied to account age.
+   A few manual test requests stays nowhere close to that limit: $0.00.
+
+---------------------------------------------------------------------
+TOTAL ESTIMATED COST FOR A 2-3 HOUR TEST: approximately $0.15 - $0.20
+(Slightly higher than the GCP version's ~$0.08-$0.15, because Fargate
+bills continuously while running instead of scaling to zero, and the ALB
+has its own base hourly charge stacking on top of that.)
+
+IF YOU FORGET TO DELETE IT (left running a full 30-day month):
+  Fargate (2 tasks, 0.25 vCPU / 0.5 GB each, 730 hrs):        ~$18.02/month
+  ALB (base charge only, light/no traffic):                   ~$16.43/month
+  Everything else (S3, ECR, data transfer):                    ~$0-1/month
+  TOTAL IF LEFT RUNNING:                                      ~$35/month
+This is meaningfully higher than GCP's "$18.25/month if forgotten" figure,
+specifically because of Fargate's continuous billing - there is no
+"it scales to zero and costs nothing when idle" safety net on AWS the way
+there is with Cloud Run. This makes prompt teardown more important on
+AWS than it was on GCP.
+
+WHAT WE ARE DELIBERATELY SKIPPING TO KEEP THIS AT MINIMAL COST:
+ - No NAT Gateway - Fargate tasks run in PUBLIC subnets with a public IP
+   assigned directly (assignPublicIp=ENABLED), which AWS confirms is
+   sufficient for pulling images from ECR and reaching S3/the internet,
+   with no NAT Gateway required. (A NAT Gateway would add a real
+   ~$0.045/hr + per-GB cost that this design avoids entirely - this is
+   the AWS equivalent of avoiding Cloud NAT on the GCP side.)
+ - No SSL certificate / HTTPS listener (per your request, same as GCP)
+ - No RDS, ElastiCache, or any other always-on billed-by-the-hour data
+   service
+ - No Elastic IPs reserved separately (the public IPs on the Fargate
+   tasks and the ALB's own IP are not billed as long as they're actively
+   attached and in use)
+ - No committed-use/Savings Plans (not relevant at this scale or duration)
+
+A NOTE ON THE AWS FREE TIER SPECIFICALLY:
+AWS changed its free-tier structure on July 15, 2025. Accounts created
+BEFORE that date keep the old "12 months free, per-service limits" model
+(e.g. 500MB/month free ECR storage, 5GB free S3 storage). Accounts
+created AFTER that date instead get a one-time expiring credit balance,
+with no automatic per-service free allowances for most of these
+resources (the 100GB/month data transfer-out allowance is the one
+exception - that one is permanent regardless of account age). The totals
+above assume NO free tier applies (the conservative, worst-case numbers)
+- in practice, if your account predates July 2025, the real total will
+likely be even lower than estimated here.
+
+Prices are current real AWS list prices as of Oct 2026 and are AWS's own
+published rates, not a quote or guarantee - actual charges depend on
+exact usage and any pricing changes AWS makes.
